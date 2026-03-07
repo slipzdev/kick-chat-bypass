@@ -8,13 +8,12 @@ Built by [Slipz](https://x.com/slipperrz) for [SlipzTools](https://tools.slipz.n
 
 ## The Problem
 
-To read Kick chat, you need to subscribe to a Pusher WebSocket channel called `chatrooms.{chatroom_id}.v2`. Getting that `chatroom_id` is the hard part:
+To read Kick chat, you need to subscribe to a Pusher WebSocket channel called `chatrooms.{chatroom_id}.v2`. 
+Getting that `chatroom_id` is the hard part:
 
 - **Official Kick API** (`api.kick.com/public/v1/channels?slug=...`) - works from servers, but does NOT return `chatroom_id`. It only returns `broadcaster_user_id`, which is a **different number**.
 - **Unofficial Kick API** (`kick.com/api/v1/channels/{slug}`) - returns `chatroom.id`, but Cloudflare blocks requests from servers.
 - **Puppeteer approach** - uses a headless browser to bypass Cloudflare. Works, but adds ~300MB of dependencies and is slow to start.
-
-### The gotcha that'll waste your time
 
 `broadcaster_user_id` is NOT the same as `chatroom_id`. For example:
 
