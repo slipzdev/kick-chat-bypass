@@ -1,0 +1,21 @@
+{
+  "name": "kick-chat-serverside",
+  "version": "1.0.0",
+  "description": "Connect to Kick.com live chat server-side with Node.js - no Puppeteer needed",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.19.0"
+  },
+  "license": "MIT",
+  "author": "slipperrz (https://x.com/slipperrz)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Saltyq/kick-chat-serverside"
+  },
+  "keywords": ["kick", "chat", "pusher", "websocket", "streaming", "overlay"]
+}
