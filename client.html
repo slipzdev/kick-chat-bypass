@@ -1,177 +1,242 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kick Chat - Server-Side Demo</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0a0f; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; padding: 2rem; }
-    h1 { font-size: 1.5rem; margin-bottom: .5rem; }
-    .subtitle { color: #888; font-size: .9rem; margin-bottom: 2rem; }
-    .connect-row { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
-    input { padding: .6rem .8rem; background: #1a1a24; border: 1px solid #333; border-radius: 4px; color: #fff; font-size: .9rem; width: 200px; }
-    input:focus { outline: none; border-color: #53fc18; }
-    button { padding: .6rem 1.2rem; background: #53fc18; color: #000; border: none; border-radius: 4px; font-weight: 600; font-size: .9rem; cursor: pointer; }
-    button:hover { background: #47d916; }
-    button:disabled { background: #333; color: #666; cursor: default; }
-    #status { font-size: .8rem; color: #888; margin-bottom: 1rem; }
-    #status.connected { color: #53fc18; }
-    #status.error { color: #ff5757; }
-    #chat { background: #111118; border: 1px solid #222; border-radius: 4px; padding: 1rem; height: 500px; overflow-y: auto; }
-    .msg { margin-bottom: .4rem; line-height: 1.4; word-wrap: break-word; }
-    .msg-user { font-weight: 700; }
-    .msg-text { color: #e0e0e0; }
-    .info { color: #53fc18; font-size: .8rem; font-style: italic; }
-    .note { background: #1a1a24; border: 1px solid #333; border-radius: 4px; padding: 1rem; margin-top: 1.5rem; font-size: .8rem; color: #888; line-height: 1.5; }
-    .note strong { color: #aaa; }
-  </style>
-</head>
-<body>
-  <h1>kick-chat-serverside</h1>
-  <p class="subtitle">Server-side Kick chat via Pusher WebSocket - no Puppeteer needed</p>
-
-  <div class="connect-row">
-    <input type="text" id="channel" placeholder="channel name (e.g. xqc)" autofocus>
-    <button id="connectBtn" onclick="connect()">Connect</button>
-  </div>
-  <div id="status">Not connected</div>
-  <div id="chat"></div>
-
-  <div class="note">
-    <strong>How it works:</strong> Your browser connects to the local server via WebSocket.
-    If the server doesn't have the chatroom ID cached, it'll ask your browser to fetch it from
-    kick.com (this works in OBS browser sources which ignore CORS, and in regular browsers if
-    kick.com allows the request). The server then connects to Kick's Pusher WebSocket and
-    forwards chat messages back to you.
-  </div>
-
-  <script>
-    let ws = null
-
-    function connect() {
-      const channel = document.getElementById('channel').value.trim().toLowerCase()
-      if (!channel) return
-
-      if (ws) { ws.onclose = null; ws.close() }
-
-      const status = document.getElementById('status')
-      const chat = document.getElementById('chat')
-      const btn = document.getElementById('connectBtn')
-
-      status.textContent = 'Connecting...'
-      status.className = ''
-      chat.innerHTML = ''
-      btn.disabled = true
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      ws = new WebSocket(`${protocol}//${window.location.host}/chat/${channel}`)
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-
-          // server needs us to resolve the chatroom_id
-          if (msg.type === 'need_chatroom_id') {
-            addInfo('Resolving chatroom ID from kick.com...')
-            resolveChatroomId(channel)
-            return
-          }
-
-          if (msg.type === 'connected') {
-            status.textContent = `Connected to ${channel} (chatroom ${msg.chatroomId})`
-            status.className = 'connected'
-            addInfo(`Connected to chatroom ${msg.chatroomId}`)
-            return
-          }
-
-          if (msg.type === 'error') {
-            addInfo(`Error: ${msg.message}`)
-            return
-          }
-
-          if (msg.type === 'message') {
-            addMessage(msg.author, msg.text, msg.color)
-          }
-        } catch {}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kick Chat - Browser SDK Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-
-      ws.onclose = () => {
-        status.textContent = 'Disconnected'
-        status.className = 'error'
-        btn.disabled = false
+      body {
+        background: #0a0a0f;
+        color: #e0e0e0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 2rem;
       }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .subtitle {
+        color: #888;
+        font-size: 0.9rem;
+        margin-bottom: 2rem;
+      }
+      .connect-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+      }
+      input {
+        padding: 0.6rem 0.8rem;
+        background: #1a1a24;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #fff;
+        font-size: 0.9rem;
+        width: 200px;
+      }
+      input:focus {
+        outline: none;
+        border-color: #53fc18;
+      }
+      button {
+        padding: 0.6rem 1.2rem;
+        background: #53fc18;
+        color: #000;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #47d916;
+      }
+      button:disabled {
+        background: #333;
+        color: #666;
+        cursor: default;
+      }
+      #status {
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 1rem;
+      }
+      #status.connected {
+        color: #53fc18;
+      }
+      #status.error {
+        color: #ff5757;
+      }
+      #chat {
+        background: #111118;
+        border: 1px solid #222;
+        border-radius: 4px;
+        padding: 1rem;
+        height: 500px;
+        overflow-y: auto;
+      }
+      .msg {
+        margin-bottom: 0.4rem;
+        line-height: 1.4;
+        word-wrap: break-word;
+      }
+      .msg-user {
+        font-weight: 700;
+      }
+      .msg-text {
+        color: #e0e0e0;
+      }
+      .info {
+        color: #53fc18;
+        font-size: 0.8rem;
+        font-style: italic;
+      }
+      .note {
+        background: #1a1a24;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 1.5rem;
+        font-size: 0.8rem;
+        color: #888;
+        line-height: 1.5;
+      }
+      .note strong {
+        color: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>kick-chat-browser-sdk</h1>
+    <p class="subtitle">
+      Direct browser connection to Kick chat via the reusable KickChat SDK
+    </p>
 
-      ws.onerror = () => ws.close()
-      ws.onopen = () => { btn.disabled = false }
-    }
+    <div class="connect-row">
+      <input
+        type="text"
+        id="channel"
+        placeholder="channel name (e.g. xqc)"
+        autofocus
+      />
+      <button id="connectBtn" onclick="connect()">Connect</button>
+    </div>
+    <div id="status">Not connected</div>
+    <div id="chat"></div>
 
-    async function resolveChatroomId(channel) {
-      let chatroomId = null
+    <div class="note">
+      <strong>How it works:</strong> Your browser resolves the Kick chatroom ID
+      from kick.com, then connects directly to Kick's Pusher WebSocket using
+      <code>kick-chat.js</code>.
+    </div>
 
-      // try v1 endpoint first
-      try {
-        const res = await fetch(`https://kick.com/api/v1/channels/${encodeURIComponent(channel)}`)
-        if (res.ok) {
-          const data = await res.json()
-          chatroomId = data.chatroom?.id
+    <script src="./kick-chat.js"></script>
+    <script>
+      let chat = null;
+
+      async function connect() {
+        const channel = document
+          .getElementById("channel")
+          .value.trim()
+          .toLowerCase();
+        if (!channel) return;
+
+        if (chat) {
+          chat.disconnect();
+          chat = null;
         }
-      } catch (err) {
-        addInfo(`v1 fetch failed (CORS expected in browsers): ${err.message}`)
-      }
 
-      // try v2 as fallback
-      if (!chatroomId) {
-        try {
-          const res = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(channel)}`)
-          if (res.ok) {
-            const data = await res.json()
-            chatroomId = data.chatroom?.id
+        const status = document.getElementById("status");
+        const chatBox = document.getElementById("chat");
+        const btn = document.getElementById("connectBtn");
+
+        status.textContent = "Connecting...";
+        status.className = "";
+        chatBox.innerHTML = "";
+        btn.disabled = true;
+
+        chat = new KickChat(channel);
+
+        chat.on("status", ({ state }) => {
+          if (state === "resolving") {
+            addInfo("Resolving chatroom ID from kick.com...");
+            return;
           }
-        } catch {}
+
+          if (state === "reconnecting") {
+            status.textContent = "Reconnecting...";
+            status.className = "";
+            addInfo("Connection dropped, reconnecting...");
+          }
+        });
+
+        chat.on("connected", ({ chatroomId }) => {
+          status.textContent = `Connected to ${channel} (chatroom ${chatroomId})`;
+          status.className = "connected";
+          addInfo(`Connected to chatroom ${chatroomId}`);
+          btn.disabled = false;
+        });
+
+        chat.on("error", ({ message }) => {
+          status.textContent = message;
+          status.className = "error";
+          addInfo(`Error: ${message}`);
+          btn.disabled = false;
+        });
+
+        chat.on("message", ({ author, text, color }) => {
+          addMessage(author, text, color);
+        });
+
+        chat.on("disconnected", () => {
+          status.textContent = "Disconnected";
+          status.className = "error";
+          btn.disabled = false;
+        });
+
+        await chat.connect();
       }
 
-      if (chatroomId && ws && ws.readyState === WebSocket.OPEN) {
-        addInfo(`Resolved chatroom ID: ${chatroomId}`)
-        ws.send(JSON.stringify({ type: 'chatroom_id', id: chatroomId }))
-      } else {
-        addInfo('Could not resolve chatroom ID. If you\'re in a regular browser, CORS blocks the request. Try from OBS browser source, or manually enter the ID.')
+      function addMessage(author, text, color) {
+        const chat = document.getElementById("chat");
+        const div = document.createElement("div");
+        div.className = "msg";
+
+        const user = document.createElement("span");
+        user.className = "msg-user";
+        user.style.color = color || "#53fc18";
+        user.textContent = author + ": ";
+
+        const txt = document.createElement("span");
+        txt.className = "msg-text";
+        txt.textContent = text;
+
+        div.appendChild(user);
+        div.appendChild(txt);
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
       }
-    }
 
-    function addMessage(author, text, color) {
-      const chat = document.getElementById('chat')
-      const div = document.createElement('div')
-      div.className = 'msg'
+      function addInfo(text) {
+        const chat = document.getElementById("chat");
+        const div = document.createElement("div");
+        div.className = "info";
+        div.textContent = text;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+      }
 
-      const user = document.createElement('span')
-      user.className = 'msg-user'
-      user.style.color = color || '#53fc18'
-      user.textContent = author + ': '
-
-      const txt = document.createElement('span')
-      txt.className = 'msg-text'
-      txt.textContent = text
-
-      div.appendChild(user)
-      div.appendChild(txt)
-      chat.appendChild(div)
-      chat.scrollTop = chat.scrollHeight
-    }
-
-    function addInfo(text) {
-      const chat = document.getElementById('chat')
-      const div = document.createElement('div')
-      div.className = 'info'
-      div.textContent = text
-      chat.appendChild(div)
-      chat.scrollTop = chat.scrollHeight
-    }
-
-    // connect on enter
-    document.getElementById('channel').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') connect()
-    })
-  </script>
-</body>
+      document.getElementById("channel").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") connect();
+      });
+    </script>
+  </body>
 </html>

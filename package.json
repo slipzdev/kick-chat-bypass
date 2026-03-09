@@ -1,21 +1,32 @@
 {
-  "name": "kick-chat-serverside",
+  "name": "kick-chat-browser-sdk",
   "version": "1.0.0",
-  "description": "Connect to Kick.com live chat server-side with Node.js - no Puppeteer needed",
-  "type": "module",
-  "main": "server.js",
+  "description": "Browser SDK for connecting directly to Kick.com live chat over Kick's Pusher websocket",
+  "main": "kick-chat.js",
+  "files": [
+    "kick-chat.js",
+    "client.html",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.21.0",
-    "ws": "^8.19.0"
+    "check": "node --check kick-chat.js",
+    "start": "python3 -m http.server 3000"
   },
   "license": "MIT",
   "author": "slipperrz (https://x.com/slipperrz)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Saltyq/kick-chat-serverside"
+    "url": "https://github.com/slipzdev/kick-chat-bypass.git"
   },
-  "keywords": ["kick", "chat", "pusher", "websocket", "streaming", "overlay"]
+  "keywords": [
+    "kick",
+    "chat",
+    "sdk",
+    "browser",
+    "pusher",
+    "websocket",
+    "streaming",
+    "overlay"
+  ]
 }
