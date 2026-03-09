@@ -1,103 +1,110 @@
-# kick-chat-serverside
+# kick-chat-bypass
 
-Connect to Kick.com live chat server-side with Node.js - no Puppeteer needed.
+Connect to Kick.com live chat directly from the browser - no server, no Puppeteer, no headless browsers.
 
-Most Kick chat libraries rely on Puppeteer to bypass Cloudflare, which is slow and heavy. This project uses a lightweight two-step approach: a web client resolves the chatroom ID once (bypassing Cloudflare via the browser), the server caches it, and connects directly to Kick's Pusher WebSocket.
+A lightweight browser SDK that resolves chatroom IDs and connects to Kick's Pusher WebSocket client-side. Works in any browser environment including OBS browser sources.
 
-Built by [Slipz](https://x.com/slipperrz) for [SlipzTools](https://tools.slipz.net).
+Built by [Slipz](https://x.com/slipperrz) for [SlipzTools](https://tools.slipz.net). Client-side rewrite by [@bebiksior](https://github.com/bebiksior).
 
 ## The Problem
 
-To read Kick chat, you need to subscribe to a Pusher WebSocket channel called `chatrooms.{chatroom_id}.v2`. 
-Getting that `chatroom_id` is the hard part:
+To read Kick chat, you need to subscribe to a Pusher WebSocket channel called `chatrooms.{chatroom_id}.v2`. Getting that `chatroom_id` is the hard part:
 
-- **Official Kick API** (`api.kick.com/public/v1/channels?slug=...`) - works from servers, but does NOT return `chatroom_id`. It only returns `broadcaster_user_id`, which is a **different number**.
-- **Unofficial Kick API** (`kick.com/api/v1/channels/{slug}`) - returns `chatroom.id`, but Cloudflare blocks requests from servers.
-- **Puppeteer approach** - uses a headless browser to bypass Cloudflare. Works, but adds ~300MB of dependencies and is slow to start.
+- **Official Kick API** (`api.kick.com`) - does NOT return `chatroom_id`. Only returns `broadcaster_user_id`, which is a different number.
+- **Unofficial Kick API** (`kick.com/api/v1/channels/{slug}`) - returns `chatroom.id`, but Cloudflare blocks server-side requests.
+- **Puppeteer approach** - uses a headless browser to bypass Cloudflare. Works, but adds ~300MB of dependencies and is slow.
 
-`broadcaster_user_id` is NOT the same as `chatroom_id`. For example:
+`broadcaster_user_id` != `chatroom_id`:
 
 | Channel | `broadcaster_user_id` | `chatroom_id` |
 |---------|----------------------|---------------|
 | xqc     | 676                  | 668           |
 
-If you subscribe to `chatrooms.676.v2` for xqc, you'll get zero messages. You need `chatrooms.668.v2`. I burned hours on this.
+Subscribing to `chatrooms.676.v2` gives you nothing. You need `chatrooms.668.v2`.
 
 ## The Solution
 
-A two-step approach:
+Skip the server entirely. The browser can fetch from `kick.com` directly (no CORS issues in browser context), resolve the chatroom ID, and connect to Pusher - all client-side.
 
 ```
-Browser Client                    Your Server                     Kick Pusher
-     |                                |                               |
-     |--- WS connect /chat/xqc ----->|                               |
-     |                                |-- check cache for chatroom_id |
-     |                                |   (miss)                      |
-     |<-- need_chatroom_id -----------|                               |
-     |                                |                               |
-     |-- fetch kick.com/api/v1/ ----->| (browser ignores CORS)       |
-     |<-- { chatroom: { id: 668 } }  |                               |
-     |                                |                               |
-     |--- { chatroom_id: 668 } ----->|                               |
-     |                                |-- cache 668                   |
-     |                                |-- connect to Pusher --------->|
-     |                                |<-- subscribe chatrooms.668.v2 |
-     |                                |                               |
-     |                                |<-- ChatMessageEvent ----------|
-     |<-- { type: message, ... } -----|                               |
+Browser
+  |
+  |-- fetch kick.com/api/v1/channels/xqc --> { chatroom: { id: 668 } }
+  |
+  |-- connect wss://ws-us2.pusher.com/...
+  |-- subscribe chatrooms.668.v2
+  |
+  |<-- ChatMessageEvent { sender: "user", content: "hello" }
 ```
 
-After the first connection, the chatroom ID is cached. All future clients (even regular browsers that can't bypass CORS) get instant connections.
+No server to maintain, no cache to poison, no proxy to DDoS.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/Saltyq/kick-chat-serverside.git
-cd kick-chat-serverside
-npm install
+git clone https://github.com/slipzdev/kick-chat-bypass.git
+cd kick-chat-bypass
 npm start
 ```
 
 Open `http://localhost:3000` in your browser. Type a channel name and hit Connect.
 
-**Note:** The chatroom ID resolution requires a browser that can fetch from `kick.com` (CORS). OBS browser sources work perfectly. Regular browsers may be blocked by CORS on the first connection, but once the ID is cached server-side, everything works.
+## Usage
 
-## WebSocket Protocol
+Include the SDK and create a connection:
 
-### Client -> Server
+```html
+<script src="kick-chat.js"></script>
+<script>
+  const chat = new KickChat('xqc')
 
-Connect to `ws://localhost:3000/chat/{channel_slug}`
+  chat.on('connected', ({ chatroomId }) => {
+    console.log('connected to chatroom', chatroomId)
+  })
 
-The server may ask you to resolve the chatroom ID:
+  chat.on('message', ({ author, text, color, raw }) => {
+    console.log(`${author}: ${text}`)
+  })
 
-```json
-{ "type": "need_chatroom_id" }
+  chat.on('error', ({ message }) => {
+    console.error(message)
+  })
+
+  chat.on('status', ({ state }) => {
+    // 'resolving' | 'reconnecting'
+    console.log('status:', state)
+  })
+
+  chat.on('disconnected', () => {
+    console.log('disconnected')
+  })
+
+  chat.connect()
+
+  // later: chat.disconnect()
+</script>
 ```
 
-Respond with:
+## Events
 
-```json
-{ "type": "chatroom_id", "id": 668 }
-```
+| Event | Data | Description |
+|-------|------|-------------|
+| `connected` | `{ chatroomId }` | Successfully subscribed to the chat channel |
+| `message` | `{ author, text, color, raw }` | Chat message received. `raw` contains the full Kick payload |
+| `error` | `{ message }` | Connection or resolution error |
+| `status` | `{ state }` | Status changes: `resolving`, `reconnecting` |
+| `disconnected` | `{}` | Clean disconnect after calling `disconnect()` |
 
-### Server -> Client
+## How It Works
 
-**Connection established:**
-```json
-{ "type": "connected", "chatroomId": 668 }
-```
+1. `KickChat` fetches the channel data from `kick.com/api/v1/channels/{slug}` (falls back to v2)
+2. Extracts `chatroom.id` from the response
+3. Opens a WebSocket to Kick's Pusher endpoint (`wss://ws-us2.pusher.com/app/...`)
+4. Subscribes to `chatrooms.{id}.v2`
+5. Parses incoming `ChatMessageEvent` messages and emits them as `message` events
+6. Sends keepalive pings every 30s to prevent Pusher from dropping the connection
+7. Auto-reconnects on disconnect (3s delay)
 
-**Chat message:**
-```json
-{
-  "type": "message",
-  "author": "someuser",
-  "text": "hello chat",
-  "color": "#FF0000"
-}
-```
+## License
 
-**Error:**
-```json
-{ "type": "error", "message": "something went wrong" }
-```
+MIT
